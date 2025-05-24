@@ -1,0 +1,63 @@
+import streamlit as st # type: ignore
+import re
+import nltk # type: ignore
+import fitz  # type: ignore # PyMuPDF
+from sklearn.feature_extraction.text import TfidfVectorizer # type: ignore
+from sklearn.metrics.pairwise import cosine_similarity # type: ignore
+
+nltk.download('stopwords')
+from nltk.corpus import stopwords # type: ignore
+STOPWORDS = set(stopwords.words('english'))
+
+def clean_text(text):
+    text = text.lower()
+    text = re.sub(r'\n', ' ', text)
+    text = re.sub(r'[^a-zA-Z0-9\s]', '', text)
+    text = ' '.join([word for word in text.split() if word not in STOPWORDS])
+    return text
+
+def read_pdf(uploaded_file):
+    try:
+        with fitz.open(stream=uploaded_file.read(), filetype="pdf") as doc:
+            text = ""
+            for page in doc:
+                text += page.get_text()
+        return text
+    except:
+        return ""
+
+st.title("🧠 AI Resume Ranker & Job Matcher")
+st.markdown("Upload your **Resume** and **Job Description** (PDF format) to check the match score.")
+
+resume_pdf = st.file_uploader("📄 Upload Resume (PDF)", type="pdf")
+job_pdf = st.file_uploader("💼 Upload Job Description (PDF)", type="pdf")
+
+if st.button("Get Match Score"):
+    if not resume_pdf or not job_pdf:
+        st.warning("Please upload both files.")
+    else:
+        resume_raw = read_pdf(resume_pdf)
+        job_raw = read_pdf(job_pdf)
+
+        if resume_raw.strip() == "" or job_raw.strip() == "":
+            st.error("❌ Could not extract text from one or both PDFs.")
+        else:
+            resume_text = clean_text(resume_raw)
+            job_text = clean_text(job_raw)
+
+            resume_text = clean_text(resume_raw)
+            job_text = clean_text(job_raw)
+
+            vectorizer = TfidfVectorizer()
+            vectors = vectorizer.fit_transform([resume_text, job_text])
+            score = cosine_similarity(vectors[0], vectors[1])[0][0]
+            match_percentage = round(score * 100, 2)
+
+            st.success(f"✅ Match Score: {match_percentage}%")
+
+            if match_percentage > 70:
+                st.info("🎯 Great match! Your resume aligns well with the job description.")
+            elif match_percentage > 40:
+                st.info("📊 Moderate match. Try including more relevant keywords.")
+            else:
+                st.info("⚠️ Low match. Tailor your resume better to this job.")
